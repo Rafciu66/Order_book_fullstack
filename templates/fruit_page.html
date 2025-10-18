@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ fruit.name }} Page</title>
+    <style>
+        body { 
+            font-family: sans-serif; 
+            display: flex; 
+            justify-content: center; 
+            align-items: flex-start;
+            min-height: 100vh; 
+            background-color: #f4f4f4; 
+            color: #333;
+            padding: 1rem 0; /* Reduced */
+            font-size: 14px; /* Smaller base font */
+        }
+        .container { 
+            background-color: white; 
+            padding: 15px; /* Reduced */
+            border-radius: 8px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1); 
+            width: 700px; /* Wider for two columns */
+            max-width: 95%; 
+        }
+        h1 { font-size: 1.5em; color: #007bff; margin: 0 0 10px 0; text-align: center; } /* Reduced */
+        h2 { font-size: 1.3em; color: #555; margin: 0 0 10px 0; } /* Reduced */
+        h3 { font-size: 1.1em; margin: 0; padding: 0 0 10px 0; } /* Reduced */
+        p { margin: 0 0 8px 0; line-height: 1.3; } /* Reduced */
+
+        /* Two-Column Layout Wrapper */
+        .content-wrapper {
+            display: flex;
+            gap: 20px; /* Space between columns */
+            align-items: flex-start;
+            text-align: left;
+            margin-top: 15px;
+        }
+        .fruit-details, .data-form {
+            flex: 1; /* Each column takes up half the space */
+        }
+        
+        img { 
+            width: 100%; /* Fill the column width */
+            max-height: 140px; /* Reduced */
+            object-fit: cover;
+            border-radius: 4px; 
+            margin-bottom: 10px; /* Space below image */
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1); 
+        }
+        .fruit-navigation { text-align: center; margin-bottom: 15px; } /* Reduced */
+        .fruit-navigation a { display: inline-block; padding: 6px 12px; margin: 0 5px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 5px; transition: background-color 0.3s ease; font-size: 0.9em; } /* Reduced */
+        .fruit-navigation a:hover { background-color: #5a6268; }
+        .fruit-navigation a.active { background-color: #007bff; }
+        
+        .logout-link-container { text-align: center; margin-top: 15px; }
+        a.logout-link { color: #dc3545; text-decoration: none; font-weight: bold; font-size: 0.9em; } /* Reduced */
+        a.logout-link:hover { text-decoration: underline; }
+
+        /* Form Styling */
+        .data-form { 
+            padding: 15px; /* Reduced */
+            border: 1px solid #eee; 
+            border-radius: 8px; 
+            background-color: #f9f9f9; 
+        }
+        .data-form div { margin-bottom: 8px; } /* Reduced */
+        .data-form label { display: block; margin-bottom: 3px; font-weight: bold; font-size: 0.9em; } /* Reduced */
+        .data-form input[type="number"] { width: calc(100% - 18px); padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 1em;} /* Reduced */
+        .data-form .radio-group { display: flex; gap: 15px; align-items: center; margin-top: 5px;} /* Reduced */
+        .data-form .radio-group input { margin-right: 4px; }
+        .data-form button { width: 100%; background-color: #28a745; color: white; padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; font-size: 1em; margin-top: 5px; } /* Reduced */
+        .data-form button:hover { background-color: #218838; }
+        .form-message { margin-top: 8px; min-height: 16px; font-size: 0.9em;} /* Reduced */
+        .form-message.success { color: green; font-weight: bold; }
+        .form-message.error { color: red; font-weight: bold; }
+
+        /* Terminal styling */
+        .terminal-wrapper { text-align: left; margin-top: 15px; }
+        .terminal-container {
+            background-color: #222;
+            color: #0f0;
+            padding: 8px; /* Reduced */
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em; /* Reduced */
+            max-height: 90px; /* Reduced */
+            overflow-y: auto;
+            white-space: pre-wrap;
+            box-shadow: inset 0 0 5px rgba(0,255,0,0.3);
+        }
+    </style>
+    <!-- Script section is unchanged -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            var socket = io();
+            var terminalOutput = document.getElementById('terminal-output');
+
+            // Fetch recent terminal history so client sees messages emitted before connect
+            fetch('/terminal_history')
+                .then(resp => resp.json())
+                .then(history => {
+                    terminalOutput.innerHTML = ''; // clear placeholder
+                    history.forEach(msg => {
+                        var el = document.createElement('div');
+                        el.textContent = msg;
+                        terminalOutput.appendChild(el);
+                    });
+                    terminalOutput.scrollTop = terminalOutput.scrollHeight;
+                })
+                .catch(()=>{ /* ignore */ });
+
+            socket.on('terminal_output', function(msg) {
+                var messageElement = document.createElement('div');
+                messageElement.textContent = msg.data;
+                terminalOutput.appendChild(messageElement);
+                terminalOutput.scrollTop = terminalOutput.scrollHeight;
+            });
+
+            const fruitForm = document.getElementById('fruit-data-form');
+            const priceInput = document.getElementById('price');
+            const quantityInput = document.getElementById('quantity');
+            const bidRadio = document.getElementById('bid');
+            const askRadio = document.getElementById('ask');
+            const formMessage = document.getElementById('form-message');
+
+            fruitForm.addEventListener('submit', function(event) {
+                let isValid = true;
+                let messages = [];
+                const price = parseFloat(priceInput.value);
+                if (isNaN(price) || price < 0 || price > 1000) {
+                    isValid = false;
+                    messages.push('Price must be 0-1000.');
+                    priceInput.style.borderColor = 'red';
+                } else { priceInput.style.borderColor = '#ddd'; }
+                const quantity = parseInt(quantityInput.value);
+                if (isNaN(quantity) || quantity <= 0) {
+                    isValid = false;
+                    messages.push('Qty must be a positive number.');
+                    quantityInput.style.borderColor = 'red';
+                } else { quantityInput.style.borderColor = '#ddd'; }
+                if (!bidRadio.checked && !askRadio.checked) {
+                    isValid = false;
+                    messages.push('Select Bid or Ask.');
+                }
+                if (!isValid) {
+                    event.preventDefault();
+                    formMessage.className = 'form-message error';
+                    formMessage.innerHTML = messages.join(' ');
+                } else {
+                    formMessage.textContent = '';
+                    formMessage.className = 'form-message';
+                }
+            });
+        });
+    </script>
+</head>
+<body>
+    <div class="container">
+        <h1>Hello, {{ username }}!</h1>
+
+        <div class="fruit-navigation">
+            <a href="{{ url_for('fruit_page', fruit_name='apple') }}" class="{% if fruit.name.lower() == 'apple' %}active{% endif %}">Apples</a>
+            <a href="{{ url_for('fruit_page', fruit_name='banana') }}" class="{% if fruit.name.lower() == 'banana' %}active{% endif %}">Bananas</a>
+        </div>
+
+        <!-- Add market info here -->
+        <div style="text-align:center; margin-bottom: 10px;">
+            <strong>Highest Bid:</strong> {{ best_bid }} &nbsp; | &nbsp;
+            <strong>Lowest Ask:</strong> {{ best_ask }}
+        </div>
+
+        <!-- NEW TWO-COLUMN WRAPPER -->
+        <div class="content-wrapper">
+            <div class="fruit-details">
+                <h2>{{ fruit.name }}</h2>
+                <p><strong>Color:</strong> {{ fruit.color }}</p>
+                <p><strong>Description:</strong> {{ fruit.description }}</p>
+                <!-- Chart.js canvas -->
+                <div style="margin-top:20px;">
+                    <canvas id="priceChart" width="320" height="180"></canvas>
+                </div>
+            </div>
+
+            <div class="data-form">
+                <h3>Place an Order</h3>
+                <div style="margin-bottom:10px; color:#007bff; font-weight:bold;">
+                    Balance: {{ balance }} &nbsp; | &nbsp; Shares: {{ position }}
+                </div>
+                <form id="fruit-data-form" method="POST" action="{{ url_for('fruit_page', fruit_name=fruit_name) }}">
+                    <div>
+                        <label for="price">Price (0 - 1000):</label>
+                        <input type="number" id="price" name="price" min="0" max="1000" step="0.01" required>
+                    </div>
+                    <div>
+                        <label for="quantity">Quantity:</label>
+                        <input type="number" id="quantity" name="quantity" min="1" required>
+                    </div>
+                    <div>
+                        <label>Order Type:</label>
+                        <div class="radio-group">
+                            <label for="bid"><input type="radio" id="bid" name="order_type" value="bid" required> Bid</label>
+                            <label for="ask"><input type="radio" id="ask" name="order_type" value="ask"> Ask</label>
+                        </div>
+                    </div>
+                    <div id="form-message" class="form-message">
+                        {% if form_message and not form_error %}<span class="success">{{ form_message }}</span>{% elif form_error %}<span class="error">{{ form_error }}</span>{% endif %}
+                    </div>
+                    <button type="submit">Submit Order</button>
+                </form>
+                <!-- User Orders List -->
+                <div style="margin-top:20px;">
+                    <h3 style="margin-bottom:8px;">Your Orders</h3>
+                    {% if user_orders and user_orders|length > 0 %}
+                        <table style="width:100%; font-size:0.95em; border-collapse:collapse;">
+                            <thead>
+                                <tr>
+                                    <th style="text-align:left;">ID</th>
+                                    <th style="text-align:left;">Side</th>
+                                    <th style="text-align:left;">Price</th>
+                                    <th style="text-align:left;">Qty</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in user_orders %}
+                                <tr>
+                                    <td>{{ order.order_id }}</td>
+                                    <td>{{ order.side }}</td>
+                                    <td>{{ order.price }}</td>
+                                    <td>{{ order.quantity }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <div style="color:#888; font-size:0.95em;">No orders yet.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="terminal-wrapper">
+            <h3>Backend Terminal Output:</h3>
+            <div id="terminal-output" class="terminal-container">
+                Awaiting messages...
+            </div>
+        </div>
+        
+        <div class="logout-link-container">
+            <a href="{{ url_for('logout') }}" class="logout-link">Logout</a>
+        </div>
+    </div>
+    <!-- Add Chart.js and chart logic at the end of body -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <script>
+        let chart;
+        let fruitName = "{{ fruit_name }}";
+
+        function fetchAndUpdateChart() {
+            fetch(`/price_history/${fruitName}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Reverse arrays so newest is on the right
+                    const reversed = [...data].reverse();
+                    // Use timestamp for x-axis labels
+                    const labels = reversed.map(item => item.timestamp ? new Date(item.timestamp) : null);
+                    const bids = reversed.map(item => item.bid);
+                    const asks = reversed.map(item => item.ask);
+
+                    if (!chart) {
+                        const ctx = document.getElementById('priceChart').getContext('2d');
+                        chart = new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: labels,
+                                datasets: [
+                                    {
+                                        label: 'Lowest Ask',
+                                        data: asks,
+                                        borderColor: 'red',
+                                        backgroundColor: 'rgba(255,0,0,0.1)',
+                                        fill: false,
+                                        tension: 0.1
+                                    },
+                                    {
+                                        label: 'Highest Bid',
+                                        data: bids,
+                                        borderColor: 'green',
+                                        backgroundColor: 'rgba(0,255,0,0.1)',
+                                        fill: false,
+                                        tension: 0.1
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: false,
+                                scales: {
+                                    x: {
+                                        type: 'time',
+                                        time: {
+                                            unit: 'minute',
+                                            tooltipFormat: 'HH:mm:ss',
+                                            displayFormats: {
+                                                minute: 'HH:mm',
+                                                second: 'HH:mm:ss'
+                                            }
+                                        },
+                                        title: { display: true, text: 'Time (newest right)' },
+                                        ticks: {
+                                            autoSkip: true,
+                                            maxTicksLimit: 8
+                                        }
+                                    },
+                                    y: {
+                                        title: { display: true, text: 'Price' }
+                                    }
+                                }
+                            }
+                        });
+                    } else {
+                        chart.data.labels = labels;
+                        chart.data.datasets[0].data = asks;
+                        chart.data.datasets[1].data = bids;
+                        chart.update();
+                    }
+                });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchAndUpdateChart();
+            setInterval(fetchAndUpdateChart, 3000); // Update every 3 seconds
+        });
+    </script>
+</body>
+</html>

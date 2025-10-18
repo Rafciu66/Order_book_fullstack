@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home</title>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; background-color: #f4f4f4; flex-direction: column; }
+        .home-container { background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; width: 400px; }
+        form { margin-top: 20px; }
+        div { margin-bottom: 15px; text-align: left; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], select { width: calc(100% - 22px); padding: 10px; border: 1px solid #ddd; border-radius: 44px; } /* Corrected border-radius */
+        .checkbox-group label { display: inline-block; margin-right: 15px; font-weight: normal; }
+        .checkbox-group input { margin-right: 5px; }
+        button { background-color: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; margin-top: 10px; }
+        button:hover { background-color: #218838; }
+        a { color: #007bff; text-decoration: none; margin-top: 20px; display: inline-block; }
+        a:hover { text-decoration: underline; }
+        .message { margin-top: 20px; color: green; font-weight: bold; }
+        .error { color: red; margin-top: 10px; }
+        #dynamic-number-display {
+    font-size: 2.5em; /* Slightly larger for emphasis */
+    font-weight: bold;
+    color: #0056b3;
+    margin-bottom: 20px;
+    /* --- Centering properties --- */
+    text-align: center; /* Center the text horizontally */
+    display: block;      /* Ensure it takes up full width for text-align to work */
+    width: 100%;         /* Ensure it spans the container */
+}
+    </style>
+    <script>
+        function validateCheckboxes(event) {
+            const checkboxA = document.getElementById('option_a');
+            const checkboxB = document.getElementById('option_b');
+            const errorMessage = document.getElementById('checkbox-error');
+
+            if (!checkboxA.checked && !checkboxB.checked) {
+                errorMessage.textContent = 'Please select either Option A or Option B.';
+                event.preventDefault();
+                return false;
+            } else if (checkboxA.checked && checkboxB.checked) {
+                errorMessage.textContent = 'Please select ONLY Option A or Option B, not both.';
+                event.preventDefault();
+                return false;
+            } else {
+                errorMessage.textContent = '';
+                return true;
+            }
+        }
+
+        // NEW JAVASCRIPT FOR DYNAMIC NUMBER
+        function fetchDynamicNumber() {
+            fetch('/get_dynamic_number') // Make a GET request to our new Flask endpoint
+                .then(response => response.json()) // Parse the JSON response
+                .then(data => {
+                    document.getElementById('dynamic-number-display').textContent = data.number; // Update the HTML element
+                })
+                .catch(error => {
+                    console.error('Error fetching dynamic number:', error);
+                });
+        }
+
+        // Call the function initially and then every few seconds
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchDynamicNumber(); // Get initial value
+            setInterval(fetchDynamicNumber, 3000); // Update every 3 seconds (3000 milliseconds)
+        });
+    </script>
+</head>
+<body>
+    <div class="home-container">
+        <h1>Welcome, {{ username }}!</h1>
+        <p>This is your home page. Let's gather some data.</p>
+
+        <p>Current Dynamic Value:</p>
+        <div id="dynamic-number-display">Loading...</div> <!-- New element to display the number -->
+
+        {% if message %}
+            <p class="message">{{ message }}</p>
+        {% endif %}
+        {% if error %}
+            <p class="error">{{ error }}</p>
+        {% endif %}
+
+        <form method="POST" onsubmit="return validateCheckboxes(event);">
+            <div>
+                <label for="list_item">Choose an item:</label>
+                <select id="list_item" name="list_item" required>
+                    <option value="">--Please choose an option--</option>
+                    
+                    <option value="banana">Banana</option>
+                    <!--
+                    <option value="orange">Orange</option>
+                    <option value="grape">Grape</option>   
+                    <option value="apple">Apple</option>
+                    -->
+                </select>
+            </div>
+
+            <div>
+                <label for="quantity">Enter quantity:</label>
+                <input type="text" id="value_input" name="quantity" placeholder="e.g., 123 or hello" required>
+            </div>
+
+            <div>
+                <label for="price">Enter price:</label>
+                <input type="text" id="value_input" name="price" placeholder="e.g., 123 or hello" required>
+            </div>
+
+            <div class="checkbox-group">
+                <p style="margin-bottom: 5px;">Select an option (either A or B):</p>
+                <input type="checkbox" id="option_a" name="choice" value="A">
+                <label for="option_a">bid</label>
+
+                <input type="checkbox" id="option_b" name="choice" value="B">
+                <label for="option_b">buy</label>
+                <p id="checkbox-error" class="error"></p>
+            </div>
+
+            <button type="submit">Submit Data</button>
+        </form>
+    </div>
+    <a href="{{ url_for('logout') }}">Logout</a>
+</body>
+</html>

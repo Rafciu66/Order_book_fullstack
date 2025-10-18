@@ -1,0 +1,7 @@
+bindings.cpp
+pyproject.toml
+setup.py
+my_engine.egg-info/PKG-INFO
+my_engine.egg-info/SOURCES.txt
+my_engine.egg-info/dependency_links.txt
+my_engine.egg-info/top_level.txt

@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: my_engine
+Version: 0.1.0
+Summary: HFT Order Book in C++
+Author: Your Name
+Dynamic: author
+Dynamic: summary
